@@ -7,6 +7,8 @@
 ## updated 15 March 2019 - completely revised data manipulation
 ## included new track2kba functions
 
+## changed deployments on 23 Sept 2019
+
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # SPECIFY SPECIES AND YEARS OF INTEREST TO AVOID DEALING WITH OLD DATA
