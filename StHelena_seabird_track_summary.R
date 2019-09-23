@@ -7,8 +7,6 @@
 ## updated 15 March 2019 - completely revised data manipulation
 ## included new track2kba functions
 
-## changed deployments on 23 Sept 2019
-
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # SPECIFY SPECIES AND YEARS OF INTEREST TO AVOID DEALING WITH OLD DATA
@@ -52,6 +50,7 @@ head(deployments)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # EXPORT DATA TO MOVEBANK
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## modified 23 Sept 2019 to overcome import failure
 exportDepl<- deployments %>% mutate(start=ymd_hms(paste(MinOfDate,format(MinOfRelease_time,format="%H:%M:%S")))) %>%
   mutate(end=ymd_hms(paste(MaxOfDate,format(MaxOfCapture_time,format="%H:%M:%S")))) %>%
   mutate(Year=year(start)) %>%
@@ -59,25 +58,33 @@ exportDepl<- deployments %>% mutate(start=ymd_hms(paste(MinOfDate,format(MinOfRe
   mutate(species=ifelse(species=="REBTR","RBTB",as.character(species))) %>%
   mutate(GPS_ID=ifelse(is.na(GPS_ID),NUM_ON_LOG,GPS_ID)) %>%
   mutate(TagID=paste(species,Year,GPS_ID, sep="_"))
-head(exportDepl) 
-
+head(exportDepl)
+tail(exportDepl)
+unique(exportDepl$species)
 fwrite(exportDepl,"StHel_Movebank_deployments.csv")
 
 
 
 exportTracks<- tracks %>% mutate(TagID=exportDepl$TagID[match(Deployment_id,exportDepl$MinOfEncounter_ID)]) %>%
   mutate(AnimalID=exportDepl$Ring_Nr[match(Deployment_id,exportDepl$MinOfEncounter_ID)]) %>%
+  mutate(species=ifelse(Species=="MASBO","MABO",as.character(Species))) %>%
+  mutate(species=ifelse(Species=="REBTR","RBTB",as.character(Species))) %>%
   mutate(DateTime=ymd_hms(paste(Date,format(Time,format="%H:%M:%S"))))
   
 head(exportTracks)
 
 #unique(exportTracks$Deployment_id) %in% exportDepl$MinOfEncounter_ID
-
+unique(exportTracks$Species)
 fwrite(exportTracks,"StHel_Movebank_tracks.csv")
 
-fwrite(exportTracks[10001:100000,],"StHel_Movebank_tracksTEST.csv")
-
-
+fwrite(exportTracks[1:50000,],"StHel_Movebank_tracks1.csv")
+fwrite(exportTracks[50001:100000,],"StHel_Movebank_tracks2.csv")
+fwrite(exportTracks[100001:150000,],"StHel_Movebank_tracks3.csv")
+fwrite(exportTracks[150001:250000,],"StHel_Movebank_tracks4.csv")
+fwrite(exportTracks[250001:450000,],"StHel_Movebank_tracks5.csv")
+fwrite(exportTracks[450001:556371,],"StHel_Movebank_tracks6.csv")
+tail(exportTracks)
+dim(exportTracks)
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
