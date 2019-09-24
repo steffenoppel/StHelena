@@ -45,6 +45,7 @@ data<-getMovebankData(study=	964155864,login=MYlogin,
                  removeDuplicatedTimestamps=T)
 ind<-getMovebankAnimals(study=	964155864,login=MYlogin)
 
+
 head(data)
 head(ind)
 
