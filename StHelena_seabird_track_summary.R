@@ -7,6 +7,8 @@
 ## updated 15 March 2019 - completely revised data manipulation
 ## included new track2kba functions
 
+### 23 Sept 2019: changed deployments to different query in RODBC_import
+
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # SPECIFY SPECIES AND YEARS OF INTEREST TO AVOID DEALING WITH OLD DATA
@@ -32,6 +34,8 @@ library(tidyverse)
 library(data.table)
 filter<-dplyr::filter
 select<-dplyr::select
+
+
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # LOAD DATA FROM DATABASE
@@ -87,6 +91,9 @@ tail(exportTracks)
 dim(exportTracks)
 
 
+
+
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # MODIFY DATA TO MEET REQUIREMENTS FOR PROCESSING
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -96,53 +103,64 @@ dim(exportTracks)
 ### none of these numbers alone are unique - the Deployment_id is the only unique number
 
 unique(tracks$Species)
+unique(deployments$species)
 tracks$Species<-ifelse(tracks$Species=="MASBO","MABO",as.character(tracks$Species))
 tracks$Species<-ifelse(tracks$Species=="REBTR","RBTB",as.character(tracks$Species))
 deployments$species<-ifelse(deployments$species=="REBTR","RBTB",as.character(deployments$species))
 
 
+
 ### CREATE DEPLOYMENTS TABLE 
 head(deployments)
-head(retrievals)
+#head(retrievals)
 
-retrievals<-retrievals %>% mutate(end=ymd_hms(paste(Date,format(Capture_time,format="%H:%M:%S")))) %>%
-  filter(end>DATE_CUTOFF) %>%
-  #filter(species %in% SPEC) %>%
-  mutate(return_mass=weight) %>%
-  dplyr::select(Ring_Nr,species,breeding_status,Nest_Nr,sex,GPS_ID,end,return_mass)
+# retrievals<-retrievals %>% mutate(end=ymd_hms(paste(Date,format(Capture_time,format="%H:%M:%S")))) %>%
+#   filter(end>DATE_CUTOFF) %>%
+#   #filter(species %in% SPEC) %>%
+#   mutate(return_mass=weight) %>%
+#   dplyr::select(Ring_Nr,species,breeding_status,Nest_Nr,sex,GPS_ID,end,return_mass)
 
-deployments<-deployments %>% mutate(start=ymd_hms(paste(Date,format(Release_time,format="%H:%M:%S")))) %>%
-  filter(start>DATE_CUTOFF) %>%
+deployments<-deployments %>% mutate(start=ymd_hms(paste(MinOfDate,format(MinOfRelease_time,format="%H:%M:%S")))) %>%
+  mutate(end=ymd_hms(paste(MaxOfDate,format(MaxOfCapture_time,format="%H:%M:%S")))) %>%
+  mutate(Year=year(start)) %>%
+  #filter(start>ymd("2019-01-01")) %>%
   #filter(species %in% SPEC) %>%
-  mutate(Longitude=nests$Longitude[match(Nest_Nr, nests$Nest_Nr)],Latitude=nests$Latitude[match(Nest_Nr, nests$Nest_Nr)]) %>%
-  mutate(TAG=if_else(is.na(NUM_ON_LOG),as.character(GPS_ID),as.character(NUM_ON_LOG)),depl_mass=weight) %>%
-  dplyr::select(Encounter_ID,Ring_Nr,species,breeding_status,Nest_Nr,sex,TAG, GPS_ID,start,depl_mass) %>%
-  left_join(retrievals, by=c('Ring_Nr','species','breeding_status','Nest_Nr','sex','GPS_ID')) %>%
-  mutate(season = ifelse(grepl(pattern="H",x=Nest_Nr, ignore.case = T),"Sept-Jan","Mar-Jul"))
-deployments %>% filter(is.na(start))
+  #mutate(Longitude=nests$Longitude[match(Nest_Nr, nests$Nest_Nr)],Latitude=nests$Latitude[match(Nest_Nr, nests$Nest_Nr)]) %>%
+  rename(Longitude=MaxOfLongitude,Latitude=MaxOfLatitude,Deployment_id=MinOfEncounter_ID,Species=species,depl_mass=weight,retrieval_mass=weight.1) %>%  
+  dplyr::select(Deployment_id,Ring_Nr,Species,Year,breeding_status,Nest_Nr,sex,start,end,depl_mass,retrieval_mass,Latitude,Longitude) %>%
+  #mutate(season = ifelse(grepl(pattern="H",x=Nest_Nr, ignore.case = T),"Sept-Jan","Mar-Jul"))
+  mutate(season = ifelse(month(start) %in% c(9,10,11,12,1),"Sept-Jan","Mar-Jul")) %>%
+  filter(!is.na(start))
+head(deployments)
+
+
 
 ### MODIFY TRACKS DATA
+head(tracks)
 tracks<-tracks %>% mutate(DateTime=ymd_hms(paste(Date,format(Time,format="%H:%M:%S")))) %>%
-  filter(DateTime>DATE_CUTOFF) %>%
+  #filter(DateTime>DATE_CUTOFF) %>%
   #filter(Species %in% SPEC) %>%
-  mutate(ID=Deployment_id) %>%
-  mutate(Season=deployments$season[match(ID,deployments$Encounter_ID)]) %>%
-  mutate(breeding_status = ifelse(grepl(pattern="incub",x=breeding_status, ignore.case = T),"incubation","chick-rearing"))
+  mutate(Season=deployments$season[match(Deployment_id,deployments$Deployment_id)]) %>%
+  mutate(breeding_status = ifelse(grepl(pattern="incub",x=breeding_status, ignore.case = T),"incubation","chick-rearing")) %>%
+  rename(ID=Deployment_id) %>%
+  arrange(ID,DateTime)
 
 dim(tracks)
 head(tracks)
-unique(tracks$Deployment_id)
-
-
+unique(tracks$ID)
 
 
 
 ### MODIFY NESTS DATA
-depl.nests <- nests %>% filter(species %in% SPEC) %>% filter(Nest_Nr %in% deployments$Nest_Nr) %>%
-  dplyr::select(Nest_Nr, Latitude, Longitude) %>%
-  full_join(deployments, by="Nest_Nr") %>%
-  rename(ID=Encounter_ID) %>%
-  dplyr::select(ID, Latitude, Longitude) 
+## no longer needed because coordinates already in deployment query
+# depl.nests <- nests %>%
+#   #filter(species %in% SPEC) %>%
+#   filter(Nest_Nr %in% deployments$Nest_Nr) %>%
+#   dplyr::select(Nest_Nr, Latitude, Longitude) %>%
+#   full_join(deployments, by="Nest_Nr") %>%
+#   rename(ID=Deployment_id) %>%
+#   dplyr::select(ID, Latitude, Longitude) 
+
 
 
 
@@ -156,12 +174,9 @@ yup<-max(tracks$Latitude)+1.5
 ylow<-min(tracks$Latitude)-1.5
 
 ### CREATE MULTIPANEL PLOT OF FORAGING TRIPS WITH INCOMPLETE TRIPS SHOWN AS DASHED LINE
-tracks %>%
-    arrange(Deployment_id,DateTime) %>%
-
 
 #pdf("StHelena_MASP_tracks.pdf", width=10, height=6)  
-ggplot(aes(x=Longitude, y=Latitude, col=breeding_status)) +
+ggplot(data=tracks,aes(x=Longitude, y=Latitude, col=breeding_status)) +
     geom_path() +
     geom_point(data=nests, aes(x=Longitude, y=Latitude), col='red', shape=16, size=1.5) +
     facet_wrap(~Species) +
@@ -212,6 +227,8 @@ fwrite(example,"C:\\STEFFEN\\track2iba\\all_orig_dev_files\\example_data\\StHel_
 
 
 
+
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # SPLIT INTO FORAGING TRIPS
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -228,8 +245,8 @@ colony<-nests %>% filter(species %in% SPEC) %>% group_by(species) %>%
   summarise(Latitude=mean(Latitude, na.rm=T), Longitude=mean(Longitude, na.rm=T)) %>%
   dplyr::select(Latitude, Longitude)
 
-multiTrips <- tripSplit(tracks[tracks$Deployment_id>1088,], Colony=colony, InnerBuff=10, ReturnBuff=25, Duration=0.25, plotit=T, rmColLocs = T)
-shortTrips <- tripSplit(tracks[tracks$Deployment_id>1088,], Colony=colony, InnerBuff=2, ReturnBuff=25, Duration=0.25, plotit=T, rmColLocs = T)
+multiTrips <- tripSplit(tracks[tracks$ID>1088,], Colony=colony, InnerBuff=10, ReturnBuff=25, Duration=0.25, plotit=T, rmColLocs = T)
+shortTrips <- tripSplit(tracks[tracks$ID>1088,], Colony=colony, InnerBuff=2, ReturnBuff=25, Duration=0.25, plotit=T, rmColLocs = T)
 
 
 
@@ -238,17 +255,18 @@ shortTrips <- tripSplit(tracks[tracks$Deployment_id>1088,], Colony=colony, Inner
 # SUMMARISE FORAGING TRIPS
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 source("C:\\STEFFEN\\track2iba\\R\\tripSummary.r")
+
 ### SUMMARISE MAX DIST FROM COLONY AND TRIP TRAVELLING TIME FOR EACH TRIP
 head(multiTrips)
 trip_distancesMulti<-tripSummary(multiTrips, Colony=colony) %>%
-  mutate(Species=deployments$species[match(ID, deployments$Encounter_ID)]) %>%
-  mutate(Stage=deployments$breeding_status[match(ID, deployments$Encounter_ID)]) %>%
+  mutate(Species=deployments$Species[match(ID, deployments$Deployment_id)]) %>%
+  mutate(Stage=deployments$breeding_status[match(ID, deployments$Deployment_id)]) %>%
   mutate(Year=year(departure)) %>%
   dplyr::select(Species,Year, Stage, trip_id, departure, return, duration, max_dist, total_dist, n_locs,direction) %>%
   mutate(InnerBuff=10)
 trip_distancesShort<-tripSummary(shortTrips, Colony=colony) %>%
-  mutate(Species=deployments$species[match(ID, deployments$Encounter_ID)]) %>%
-  mutate(Stage=deployments$breeding_status[match(ID, deployments$Encounter_ID)]) %>%
+  mutate(Species=deployments$Species[match(ID, deployments$Deployment_id)]) %>%
+  mutate(Stage=deployments$breeding_status[match(ID, deployments$Deployment_id)]) %>%
   mutate(Year=year(departure)) %>%
   dplyr::select(Species,Year, Stage, trip_id, departure, return, duration, max_dist, total_dist, n_locs,direction) %>%
   mutate(InnerBuff=2)
