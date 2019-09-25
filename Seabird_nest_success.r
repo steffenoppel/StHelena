@@ -134,6 +134,7 @@ logexp <- function(exposure = 1)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 library(lme4)
 library(AICcmodavg)
+library(merTools)
 
 m0<-glmer(SUCC~1+(1|Year_Nest), data=nests,family=binomial(link=logexp(exposure=nests$exposure)))
 m1<-glmer(SUCC~SEASON+(1|Year_Nest), data=nests,family=binomial(link=logexp(exposure=nests$exposure)))
@@ -159,20 +160,16 @@ summary(m4)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # PREDICT NEST SURVIVAL FOR REPORTING MEAN AND CONFIDENCE INTERVAL
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-m4pred<-glm(SUCC~SEASON+TYPE+tracked, data=nests,family=binomial(link=logexp(exposure=nests$exposure)))
-
-
 output<-nests %>% 
-#   group_by(SEASON,TYPE,tracked) %>%
-#   summarise(succ=mean(SUCC)) %>%
-#   mutate(exposure=42+70)
-# 
-# output<- output %>%
-  mutate(pred_succ=predict(m4pred, newdata= output, type='response')) %>%
-  mutate(pred_se=predict(m4pred, newdata= output, type='response', se.fit=T)$se.fit) %>%
-  group_by(SEASON,TYPE,tracked) %>%
-  summarise(succ=mean(pred_succ), lcl=mean(pred_succ-1.96*pred_se),ucl=mean(pred_succ+1.96*pred_se))
+  group_by(SEASON,TYPE,tracked,Year_Nest) %>%
+  summarise(raw.breed.succ=mean(SUCC)) %>%
+  mutate(exposure=42+70)
 
+output<- bind_cols(output,predictInterval(m4, newdata= output, level=0.95)) %>%
+  mutate(estimated.nest.survival=plogis(fit)^(exposure),lcl=plogis(lwr)^(exposure),ucl=plogis(upr)^(exposure)) %>%
+  select(-exposure,-lwr,-upr) %>%
+  ungroup() %>%
+  mutate(tracked=ifelse(tracked==0,"untracked birds","tracked birds"))
 
 write.table(output, "StHelena_MASPE_nest_survival_summary.csv",row.names=F, sep=',')
 
@@ -184,13 +181,18 @@ write.table(output, "StHelena_MASPE_nest_survival_summary.csv",row.names=F, sep=
 # PRODUCE PLOT TO SHOW BREEDING SUCCESS DIFFERENCES
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-ggplot(output, aes(y=succ, x=tracked,color=SEASON)) + geom_point(size=2)+
+output %>% mutate(Year=as.numeric(as.character(Year_Nest))) %>%
+  mutate(Year=ifelse(SEASON=="COOL",Year-0.25,Year+0.25)) %>%
+
+
+ggplot(aes(y=estimated.nest.survival, x=Year,color=SEASON)) + geom_point(size=2)+
   geom_errorbar(aes(ymin=lcl, ymax=ucl), width=.1)+
-  facet_wrap(~TYPE, ncol=1) +
-  xlab("Whether birds were tracked or not") +
+  facet_wrap(~tracked, ncol=2) +
+  xlab("Year") +
   ylab("Estimated breeding success") +
+  scale_y_continuous(name="Estimated breeding success", limits=c(0,1), breaks=seq(0,1,0.2), labels=seq(0,1,0.2)) +
   theme(panel.background=element_rect(fill="white", colour="black"), 
-        axis.text=element_text(size=18, color="black"), 
+        axis.text=element_text(size=14, color="black"), 
         axis.title=element_text(size=20), 
         strip.text.x=element_text(size=18, color="black"), 
         strip.background=element_rect(fill="white", colour="black"), 
