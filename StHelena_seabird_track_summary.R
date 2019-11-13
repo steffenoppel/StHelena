@@ -243,7 +243,7 @@ ggplot(data=tracks,aes(x=Longitude, y=Latitude, col=breeding_status)) +
         panel.border = element_blank())
 
 
-
+ggsave("StHelena_seabird_areas.pdf", width=7, height=10)
 
 
 
