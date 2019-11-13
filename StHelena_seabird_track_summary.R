@@ -9,13 +9,15 @@
 
 ### 23 Sept 2019: changed deployments to different query in RODBC_import
 
+### 13 Nov 2019: reduced script to make it less confusing
+
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # SPECIFY SPECIES AND YEARS OF INTEREST TO AVOID DEALING WITH OLD DATA
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 library(lubridate)
 DATE_CUTOFF<-ymd("2017-01-01")
-SPEC<-c("MASPE")
+SPEC<-c("MASPE","BRONO")
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -49,86 +51,37 @@ head(tracks)
 head(deployments)
 
 
-
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# EXPORT DATA TO MOVEBANK
+# MODIFY SPECIES NAMES
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-## modified 23 Sept 2019 to overcome import failure
-exportDepl<- deployments %>% mutate(start=ymd_hms(paste(MinOfDate,format(MinOfRelease_time,format="%H:%M:%S")))) %>%
-  mutate(end=ymd_hms(paste(MaxOfDate,format(MaxOfCapture_time,format="%H:%M:%S")))) %>%
-  mutate(Year=year(start)) %>%
-  mutate(species=ifelse(species=="MASBO","MABO",as.character(species))) %>%
-  mutate(species=ifelse(species=="REBTR","RBTB",as.character(species))) %>%
-  mutate(GPS_ID=ifelse(is.na(GPS_ID),NUM_ON_LOG,GPS_ID)) %>%
-  mutate(TagID=paste(species,Year,GPS_ID, sep="_"))
-head(exportDepl)
-tail(exportDepl)
-unique(exportDepl$species)
-fwrite(exportDepl,"StHel_Movebank_deployments.csv")
+## THIS MAY NO LONGER BE NECESSARY IF SPECIES NAMES HAVE BEEN CHANGED IN ACCESS DATABASE
 
-
-
-exportTracks<- tracks %>% mutate(TagID=exportDepl$TagID[match(Deployment_id,exportDepl$MinOfEncounter_ID)]) %>%
-  mutate(AnimalID=exportDepl$Ring_Nr[match(Deployment_id,exportDepl$MinOfEncounter_ID)]) %>%
-  mutate(species=ifelse(Species=="MASBO","MABO",as.character(Species))) %>%
-  mutate(species=ifelse(Species=="REBTR","RBTB",as.character(Species))) %>%
-  mutate(DateTime=ymd_hms(paste(Date,format(Time,format="%H:%M:%S"))))
-  
-head(exportTracks)
-
-#unique(exportTracks$Deployment_id) %in% exportDepl$MinOfEncounter_ID
-unique(exportTracks$Species)
-fwrite(exportTracks,"StHel_Movebank_tracks.csv")
-
-fwrite(exportTracks[1:50000,],"StHel_Movebank_tracks1.csv")
-fwrite(exportTracks[50001:100000,],"StHel_Movebank_tracks2.csv")
-fwrite(exportTracks[100001:150000,],"StHel_Movebank_tracks3.csv")
-fwrite(exportTracks[150001:250000,],"StHel_Movebank_tracks4.csv")
-fwrite(exportTracks[250001:450000,],"StHel_Movebank_tracks5.csv")
-fwrite(exportTracks[450001:556371,],"StHel_Movebank_tracks6.csv")
-tail(exportTracks)
-dim(exportTracks)
-
-
+tracks$Species<-ifelse(tracks$Species=="MASBO","MABO",as.character(tracks$Species))
+tracks$Species<-ifelse(tracks$Species=="REBTR","RBTB",as.character(tracks$Species))
+deployments$species<-ifelse(deployments$species=="REBTR","RBTB",as.character(deployments$species))
+unique(tracks$Species)
+unique(deployments$species)
 
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # MODIFY DATA TO MEET REQUIREMENTS FOR PROCESSING
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### CREATE DEPLOYMENTS TABLE
 # THERE ARE MULTIPLE DEPLOYMENTS PER NEST
 # THERE ARE MULTIPLE DEPLOYMENTS PER RING NR
 # THERE ARE MULTIPLE DEPLOYMENTS OF GPS TAGS
 ### none of these numbers alone are unique - the Deployment_id is the only unique number
 
-unique(tracks$Species)
-unique(deployments$species)
-tracks$Species<-ifelse(tracks$Species=="MASBO","MABO",as.character(tracks$Species))
-tracks$Species<-ifelse(tracks$Species=="REBTR","RBTB",as.character(tracks$Species))
-deployments$species<-ifelse(deployments$species=="REBTR","RBTB",as.character(deployments$species))
 
-
-
-### CREATE DEPLOYMENTS TABLE 
-head(deployments)
-#head(retrievals)
-
-# retrievals<-retrievals %>% mutate(end=ymd_hms(paste(Date,format(Capture_time,format="%H:%M:%S")))) %>%
-#   filter(end>DATE_CUTOFF) %>%
-#   #filter(species %in% SPEC) %>%
-#   mutate(return_mass=weight) %>%
-#   dplyr::select(Ring_Nr,species,breeding_status,Nest_Nr,sex,GPS_ID,end,return_mass)
+### MODIFY DEPLOYMENTS DATA
 
 deployments<-deployments %>% mutate(start=ymd_hms(paste(MinOfDate,format(MinOfRelease_time,format="%H:%M:%S")))) %>%
   mutate(end=ymd_hms(paste(MaxOfDate,format(MaxOfCapture_time,format="%H:%M:%S")))) %>%
   mutate(Year=year(start)) %>%
-  #filter(start>ymd("2019-01-01")) %>%
   #filter(species %in% SPEC) %>%
-  #mutate(Longitude=nests$Longitude[match(Nest_Nr, nests$Nest_Nr)],Latitude=nests$Latitude[match(Nest_Nr, nests$Nest_Nr)]) %>%
   rename(Longitude=MaxOfLongitude,Latitude=MaxOfLatitude,Deployment_id=MinOfEncounter_ID,Species=species,depl_mass=weight,retrieval_mass=weight.1) %>%  
   dplyr::select(Deployment_id,Ring_Nr,Species,Year,breeding_status,Nest_Nr,sex,start,end,depl_mass,retrieval_mass,Latitude,Longitude) %>%
-  #mutate(season = ifelse(grepl(pattern="H",x=Nest_Nr, ignore.case = T),"Sept-Jan","Mar-Jul"))
   mutate(season = ifelse(month(start) %in% c(9,10,11,12,1),"Sept-Jan","Mar-Jul")) %>%
   filter(!is.na(start))
 head(deployments)
@@ -138,7 +91,6 @@ head(deployments)
 ### MODIFY TRACKS DATA
 head(tracks)
 tracks<-tracks %>% mutate(DateTime=ymd_hms(paste(Date,format(Time,format="%H:%M:%S")))) %>%
-  #filter(DateTime>DATE_CUTOFF) %>%
   #filter(Species %in% SPEC) %>%
   mutate(Season=deployments$season[match(Deployment_id,deployments$Deployment_id)]) %>%
   mutate(breeding_status = ifelse(grepl(pattern="incub",x=breeding_status, ignore.case = T),"incubation","chick-rearing")) %>%
@@ -148,19 +100,6 @@ tracks<-tracks %>% mutate(DateTime=ymd_hms(paste(Date,format(Time,format="%H:%M:
 dim(tracks)
 head(tracks)
 unique(tracks$ID)
-
-
-
-### MODIFY NESTS DATA
-## no longer needed because coordinates already in deployment query
-# depl.nests <- nests %>%
-#   #filter(species %in% SPEC) %>%
-#   filter(Nest_Nr %in% deployments$Nest_Nr) %>%
-#   dplyr::select(Nest_Nr, Latitude, Longitude) %>%
-#   full_join(deployments, by="Nest_Nr") %>%
-#   rename(ID=Deployment_id) %>%
-#   dplyr::select(ID, Latitude, Longitude) 
-
 
 
 
@@ -194,38 +133,6 @@ ggplot(data=tracks,aes(x=Longitude, y=Latitude, col=breeding_status)) +
         panel.border = element_blank())
 
 dev.off()
-
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# PLOT THE CHICK-REARING 2019 DATA TO FIX tripSPlit
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-### CREATE MULTIPANEL PLOT OF FORAGING TRIPS WITH INCOMPLETE TRIPS SHOWN AS DASHED LINE
-example<-tracks %>%
-  arrange(Deployment_id,DateTime) %>%
-  filter(Deployment_id==1106) %>%
-  mutate(TimeGap=as.numeric(DateTime-dplyr::lag(DateTime))) %>%
-  #mutate(TimeGap=if_else(TimeGap<65,1,if_else(TimeGap<240,2,3))) %>%
-  
-  #pdf("StHelena_MASP_tracks.pdf", width=10, height=6)  
-  ggplot(aes(x=Longitude, y=Latitude)) +
-  geom_path() +
-  geom_point(aes(x=Longitude, y=Latitude, size=TimeGap), col='firebrick') +
-  geom_point(data=nests, aes(x=Longitude, y=Latitude), shape=16, size=1.5) +
-  theme(panel.background=element_rect(fill="white", colour="black"), 
-        axis.text=element_text(size=16, color="black"), 
-        axis.title=element_text(size=18), 
-        strip.text.x=element_text(size=16, color="black"), 
-        strip.background=element_rect(fill="white", colour="black"), 
-        panel.grid.major = element_line("white",0), 
-        panel.grid.minor = element_line("white",0), 
-        panel.border = element_blank())
-
-
-
-fwrite(example,"C:\\STEFFEN\\track2iba\\all_orig_dev_files\\example_data\\StHel_StormPetrel_tripSplit_example.csv")
-
-
 
 
 
@@ -281,57 +188,6 @@ dim(trip_distances)
 fwrite(trip_distances, "StHelena_MASPE_TripSummaries2019_byradius.csv")
 fwrite(deployments, "StHelena_MASPE_Deployments.csv")
 
-
-
-
-
-
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# EXPORT TO BIRDLIFE TRACKING DATABASE
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-## OUTPUT MUST BE IN THIS FORMAT
-
-#names(export)<-c("BirdId","Sex","Age","Breed Stage","TrackId","DateGMT","TimeGMT","Latitude","Longitude","Equinox","ArgosQuality")
-#head(export)
-
-#Sex	limited choice	String	female	male 	unknown											
-#Age	limited choice	String	adult	immature	juvenile	fledgling	unknown									
-#Breed Stage	limited choice	String	pre-egg	incubation	brood-guard	post-guard	chick-rearing	creche	breeding	fail (breeding season)	migration	winter	sabbatical	pre-moult	non-breeding	unknown
-
-head(tracks)
-
-export <- tracks[,-(11)] %>% filter(Species=="MASPE") %>%
-  mutate(breeding_status=ifelse(breeding_status %in% c("Incubation","INCUBATION","Incubating","INCUBATING ADULT"),"incubation",breeding_status)) %>%
-  mutate(breeding_status=ifelse(breeding_status %in% c("Brood-guard","brood-guard"),"brood-guard","chick-rearing")) %>%
-  mutate(Sex=ifelse(sex %in% c("male", "female"),as.character(sex),"unknown")) %>%
-  mutate(DateGMT=format(Date, format="%d/%m/%Y")) %>%
-  mutate(TimeGMT=format(Time, format="%H:%M:%S")) %>%
-  mutate(BirdId=deployments$Ring_Nr[match(ID, deployments$Encounter_ID)]) %>%
-  #mutate(Age=ifelse(age==2,"adult","fledgling")) %>%
-  mutate(Age="adult") %>%
-  select(BirdId,Sex,Age,breeding_status,ID,DateGMT,TimeGMT,Latitude,Longitude)
-  names(export)<-c("BirdId","Sex","Age","Breed Stage","TrackId","DateGMT","TimeGMT","Latitude","Longitude")
-head(export)
-dim(export)
-write.table(export,"MASPE_SeabirdTrackDB_1401.csv", row.names=F, sep=",")
-
-export <- tracks[,-(11)] %>% filter(Species=="BRONO") %>%
-  mutate(breeding_status=ifelse(breeding_status %in% c("Incubation","INCUBATION","Incubating","INCUBATING ADULT"),"incubation",breeding_status)) %>%
-  mutate(breeding_status=ifelse(breeding_status %in% c("Brood-guard","brood-guard"),"brood-guard","chick-rearing")) %>%
-  mutate(Sex=ifelse(sex %in% c("male", "female"),as.character(sex),"unknown")) %>%
-  mutate(DateGMT=format(Date, format="%d/%m/%Y")) %>%
-  mutate(TimeGMT=format(Time, format="%H:%M:%S")) %>%
-  mutate(BirdId=deployments$Ring_Nr[match(ID, deployments$Encounter_ID)]) %>%
-  #mutate(Age=ifelse(age==2,"adult","fledgling")) %>%
-  mutate(Age="adult") %>%
-  select(BirdId,Sex,Age,breeding_status,ID,DateGMT,TimeGMT,Latitude,Longitude)
-names(export)<-c("BirdId","Sex","Age","Breed Stage","TrackId","DateGMT","TimeGMT","Latitude","Longitude")
-head(export)
-dim(export)
-write.table(export,"BRONO_SeabirdTrackDB_1400.csv", row.names=F, sep=",")
 
 
 
