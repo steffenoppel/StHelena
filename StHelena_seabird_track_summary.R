@@ -39,9 +39,23 @@ filter<-dplyr::filter
 select<-dplyr::select
 
 ###### LOAD NEW PACKAGE DEVELOPED BY BIRDLIFE ######
-library(devtools)
-devtools::install_github("steffenoppel/track2iba", dependencies=T)
+#library(devtools)
+#devtools::install_github("steffenoppel/track2iba", dependencies=T)
 library(track2KBA)
+
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# LOAD THE EEZ DATA FOR ST HELENA
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+setwd("C:\\STEFFEN\\RSPB\\Marine\\World_EEZ")
+EEZ<- readShapePoly("UK_EEZ.shp")
+proj4string(EEZ)<-CRS("+proj=longlat +ellps=WGS84")
+STHEEZ<-subset(EEZ, Country=="Saint Helena")
+EEZplot<-fortify(STHEEZ)
+
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -118,13 +132,16 @@ ylow<-min(tracks$Latitude)-1.5
 
 ### CREATE MULTIPANEL PLOT OF FORAGING TRIPS FOR SPECIES, SEASON and STAGE
 
-ggplot(data=tracks,aes(x=Longitude, y=Latitude, col=breeding_status)) +
-    geom_path() +
-    geom_point(data=nests, aes(x=Longitude, y=Latitude), col='green', shape=16, size=1.5) +
+ggplot() +
+    geom_path(data=tracks,aes(x=Longitude, y=Latitude, col=breeding_status)) +
     facet_wrap(~Species+Season+breeding_status, ncol=2) +
     coord_sf(xlim = c(xlow, xup), ylim = c(ylow, yup), expand = FALSE) +
-    borders("world",fill="black",colour="black") +
   
+  ### ADD ISLAND AND EEZ
+    geom_point(data=nests, aes(x=Longitude, y=Latitude), col='green', shape=16, size=1.5) +
+    geom_polygon(data=EEZplot[EEZplot$piece==1,], aes(x=long, y=lat),size=1,colour="darkgrey", fill=NA) +
+  
+  ### FORMAT PLOT AND LEGEND
     guides(colour=guide_legend(title="Breeding Stage",override.aes = list(size = 4)))+
     scale_color_manual(values=c("firebrick","midnightblue")) +
     theme(panel.background=element_rect(fill="white", colour="black"), 
@@ -140,38 +157,6 @@ ggplot(data=tracks,aes(x=Longitude, y=Latitude, col=breeding_status)) +
         panel.border = element_blank())
 
 
-
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# CALCULATE KERNEL UD AND PLOT ON MAP
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-xlow<-min(tracks$Longitude)-1.5
-xup<-max(tracks$Longitude)+1.5
-yup<-max(tracks$Latitude)+1.5
-ylow<-min(tracks$Latitude)-1.5
-
-### CREATE MULTIPANEL PLOT OF FORAGING TRIPS FOR SPECIES, SEASON and STAGE
-
-ggplot(data=tracks,aes(x=Longitude, y=Latitude, col=breeding_status)) +
-  geom_path() +
-  geom_point(data=nests, aes(x=Longitude, y=Latitude), col='green', shape=16, size=1.5) +
-  facet_wrap(~Species+Season+breeding_status, ncol=2) +
-  coord_sf(xlim = c(xlow, xup), ylim = c(ylow, yup), expand = FALSE) +
-  borders("world",fill="black",colour="black") +
-  
-  guides(colour=guide_legend(title="Breeding Stage",override.aes = list(size = 4)))+
-  scale_color_manual(values=c("firebrick","midnightblue")) +
-  theme(panel.background=element_rect(fill="white", colour="black"), 
-        axis.text=element_text(size=16, color="black"), 
-        axis.title=element_text(size=18), 
-        strip.text.x=element_text(size=16, color="black"), 
-        strip.background=element_rect(fill="white", colour="black"), 
-        legend.key = element_blank(),
-        legend.title=element_text(size=16),
-        legend.text=element_text(size=14),
-        panel.grid.major = element_line("white",0), 
-        panel.grid.minor = element_line("white",0), 
-        panel.border = element_blank())
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -212,20 +197,25 @@ ver50_df <- fortify(ver50) %>% separate(id,into=c("Species","Season","breeding_s
 tracks <- tracks %>%
   arrange(ID,DateTime)
 
-ggplot(data=tracks,aes(x=Longitude, y=Latitude, col=breeding_status)) +
-  geom_path() +
+ggplot() +
+  ### ADD ISLAND AND EEZ
   geom_point(data=nests, aes(x=Longitude, y=Latitude), col='green', shape=16, size=1.5) +
-  facet_wrap(~Species+Season+breeding_status, ncol=2) +
-  coord_sf(xlim = c(xlow, xup), ylim = c(ylow, yup), expand = FALSE) +
-  borders("world",fill="black",colour="black") +
+  geom_polygon(data=EEZplot[EEZplot$piece==1,], aes(x=long, y=lat),size=1,colour="darkgrey", fill=NA) +
+  #borders("world",fill="black",colour="black") +
   
+  ### ADD TRACKING DATA
+  geom_path(data=tracks,aes(x=Longitude, y=Latitude, col=breeding_status)) +
+  geom_point(data=nests, aes(x=Longitude, y=Latitude), col='green', shape=16, size=1.5) +
+  facet_wrap(~Species+Season+breeding_status, ncol=2, scales="free") +
+  #coord_sf(xlim = c(xlow, xup), ylim = c(ylow, yup), expand = FALSE) +
+
   ### ADD THE CONCENTRATION AREAS
   geom_polygon(data=ver50_df, aes(x=long, y=lat, group=piece,fill=id),colour="black", lwd=1, alpha = .7, fill='goldenrod')+
   geom_polygon(data=ver75_df, aes(x=long, y=lat, group=group),colour="black", lwd=1,alpha = .5, fill='goldenrod')+
   geom_polygon(data=ver95_df, aes(x=long, y=lat, group=group),colour="black", lwd=1, lty=2,alpha = .3, fill='goldenrod')+
   
+
   ### ADD LEGEND AND MODIFY COLOR
-  
   guides(colour=guide_legend(title="Breeding Stage",override.aes = list(size = 4)))+
   scale_color_manual(values=c("firebrick","midnightblue")) +
   
