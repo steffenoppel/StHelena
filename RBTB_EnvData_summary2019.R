@@ -4,6 +4,8 @@
 ## written by steffen oppel 10 Oct 2019
 ## Downloaded data from Movebank on 24 Sept 2019 (environmental variables contemporaneously to tracking data)
 
+## updated on 26 Nov 2019 to include more environmental variables
+
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -12,14 +14,17 @@
 library(move)
 library(tidyverse)
 library(lubridate)
+library(data.table)
 filter<-dplyr::filter
 select<-dplyr::select
+library(rworldmap) # library rworldmap provides different types of global maps, e.g:
+data(countriesLow)
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # IMPORT DATA FROM MOVEBANK
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-MYlogin<-movebankLogin(username="Steffen",password="xxxx")
+MYlogin<-movebankLogin(username="Steffen",password=xxxxxxxx)
 data<-getMovebankData(study=	964155864,login=MYlogin,
                  removeDuplicatedTimestamps=T)
 ind<-getMovebankAnimals(study=	964155864,login=MYlogin)
@@ -37,35 +42,37 @@ head(ind)
 
 ### Load data from database
 #setwd("S:/ConSci/DptShare/SteffenOppel/RSPB/UKOT/StHelena/Science/Birds/seabirds")
-setwd("C:/STEFFEN/RSPB/UKOT/StHelena/Science/Birds/seabirds/TrackingData")
-envdatRAW<-fread("St Helena seabird tracking-5528736674850573850.csv")
+setwd("C:/STEFFEN/RSPB/UKOT/StHelena/Science/Birds/seabirds")
+envdatRAW<-fread("St Helena seabird tracking-5605684338234142518.csv")
 head(envdatRAW)
 
 
-
+### RENAME THE VARIABLES ###
 envdat<-envdatRAW %>%
-	select(-visible) %>%
+	select(-visible,-`study-name`,-`VIIRS Ocean Mapped OceanColor 4km 8d Euphotic Depth`,-`MODIS Ocean Aqua OceanColor 4km Monthly POC`) %>%  ### too many missing data
 	mutate(timestamp=ymd_hms(timestamp)) %>%
   mutate(year=year(timestamp)) %>%
   rename(event_id=`event-id`,
-	`taxon_canonical_name`=`individual-taxon-canonical-name`,
-	tag_local_identifier=`tag-local-identifier`,
-	location_lat=`location-lat`,
-	location_long=`location-long`,
-	SSTnight=`MODIS Ocean Aqua OceanColor 4km 8d Nighttime SST (Bands 22-23)`,
-    NPP=`OSU Ocean NPP 0.083deg 8d NPP`,
-    Wind_U=`ECMWF Interim Full Daily SFC-FC Wind (10 m above Ground U Component)`,
-    CHLA=`MODIS Ocean Aqua OceanColor 4km 8d Chlorophyll A (OCI)`,
-    Wind_V=`ECMWF Interim Full Daily SFC-FC Wind (10 m above Ground V Component)`,
-    SST=`MODIS Ocean Aqua OceanColor 4km 8d Daytime SST`,
-	Curr_V=`OSCAR 1/3deg 5d Surface Currents Meridional Velocity`,
-	Curr_U=`OSCAR 1/3deg 5d Surface Currents Zonal Velocity`) %>%
+         `taxon_canonical_name`=`individual-taxon-canonical-name`,
+         tag_local_identifier=`tag-local-identifier`,
+         location_lat=`location-lat`,
+         location_long=`location-long`,
+         Wind_U=`ECMWF Interim Full Daily SFC Wind (10 m above Ground U Component)`,
+    Wind_V=`ECMWF Interim Full Daily SFC Wind (10 m above Ground V Component)`,
+    CHLA=`MODIS Ocean Aqua OceanColor 4km Monthly Chlorophyll A (OCI)`,
+    SST=`ECMWF Interim Full Daily SFC Sea Surface Temperature`,
+	  Curr_V=`OSCAR 1/3deg 5d Surface Currents Meridional Velocity`,
+	  Curr_U=`OSCAR 1/3deg 5d Surface Currents Zonal Velocity`,
+	Uplift=`Movebank Thermal Uplift (from ECMWF)`,
+	Rain=`ECMWF Interim Full Daily SFC-FC Total Precipitation`,
+	Pressure=`ECMWF Interim Full Daily SFC Mean Sea Level Pressure`,
+	AirTemp=`ECMWF Interim Full Daily SFC Temperature (Vertically Integrated)`,
+	Charnock=`ECMWF Interim Full Daily SFC Charnock Parameter`,
+	Sunshine=`ECMWF Interim Full Daily SFC-FC Sunshine Duration`,
+	Cloud=`ECMWF Interim Full Daily SFC Total Cloud Cover`,
+	WaveHeight=`ECMWF Interim Full Daily SFC Significant Wave Height`,
+	WaveDirection=`ECMWF Interim Full Daily SFC Mean Wave Direction`) %>%
   mutate(windspeed=sqrt(Wind_U^2+Wind_V^2), currentspeed=sqrt(Curr_U^2+Curr_V^2))
-
-
-
-
-
 
 
 
@@ -89,7 +96,50 @@ head(ind)
 ALLDATA<- envdat %>% left_join(ind, by=c("tag_local_identifier","taxon_canonical_name")) %>%
 	select(-sensor_type_id,-comments,-death_comments,-earliest_date_born,-exact_date_of_birth,-latest_date_born,-tag_local_identifier,-local_identifier,-nick_name,-taxon_detail) %>%
 	mutate(SEASON= ifelse(month(timestamp) %in% c(9,10,11,12,1,2),"hot","cool"))
+head(ALLDATA)
+dim(ALLDATA)
 
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# REMOVE LOCATIONS ON LAND
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+DAT<-SpatialPointsDataFrame(coords=ALLDATA[,3:4], proj4string=CRS("+proj=longlat +datum=WGS84"), data=ALLDATA)
+proj4string(DAT)<-proj4string(countriesLow)
+overlay<-over(DAT,countriesLow)
+overlay<- overlay %>% mutate(index=seq(1:dim(overlay)[1])) %>%
+  filter(is.na(NAME))
+ALLDATA<- ALLDATA[overlay$index,]
+dim(ALLDATA)
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# SUMMARISE ENVIRONMENTAL DATA USED BY EACH SPECIES, YEAR, AND SEASON
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+head(ALLDATA)
+
+envsummary<- ALLDATA %>% mutate(Year=year(timestamp)) %>%
+  group_by(taxon_canonical_name,SEASON,Year) %>%
+  summarise(SST=mean(SST,na.rm=T),
+            CHLA=mean(CHLA,na.rm=T),
+            Wind_speed=mean(windspeed,na.rm=T),
+            Current_speed=mean(currentspeed,na.rm=T),
+            Rain=mean(Rain,na.rm=T),
+            Uplift=mean(Uplift,na.rm=T),
+            AirTemp=mean(AirTemp,na.rm=T),
+            Sunshine=mean(Sunshine,na.rm=T),
+            Cloud=mean(Cloud,na.rm=T),
+            WaveHeight=mean(WaveHeight,na.rm=T),
+            WaveDirection=mean(WaveDirection,na.rm=T),
+            Charnock=mean(Charnock,na.rm=T))
+
+
+envsummary
+fwrite(envsummary,"StHelena_seabirds_envdat_summary.csv")
 
 
 
@@ -97,28 +147,27 @@ ALLDATA<- envdat %>% left_join(ind, by=c("tag_local_identifier","taxon_canonical
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # SUMMARISE ENVIRONMENTAL DATA USED BY EACH SPECIES, YEAR, AND SEASON
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-### THIS WILL REQUIRE MORE WORK:
-### (1) REMOVE LOCATIONS ON LAND
-### (2) group by variables of interest (year?, season?)
-
-
 
 head(ALLDATA)
 
-envsummary<- ALLDATA %>% group_by(taxon_canonical_name,SEASON) %>%
-  summarise(SSTn=mean(SSTnight,na.rm=T),
-            SSTd=mean(SST,na.rm=T),
-            NPP=mean(NPP,na.rm=T),
+envsummary<- ALLDATA %>% mutate(Year=year(timestamp)) %>%
+  group_by(taxon_canonical_name,SEASON,Year) %>%
+  summarise(SST=mean(SST,na.rm=T),
             CHLA=mean(CHLA,na.rm=T),
             Wind_speed=mean(windspeed,na.rm=T),
-            Current_speed=mean(currentspeed,na.rm=T))
+            Current_speed=mean(currentspeed,na.rm=T),
+            Rain=mean(Rain,na.rm=T),
+            Uplift=mean(Uplift,na.rm=T),
+            AirTemp=mean(AirTemp,na.rm=T),
+            Sunshine=mean(Sunshine,na.rm=T),
+            Cloud=mean(Cloud,na.rm=T),
+            WaveHeight=mean(WaveHeight,na.rm=T),
+            WaveDirection=mean(WaveDirection,na.rm=T),
+            Charnock=mean(Charnock,na.rm=T))
 
 
 envsummary
-
-
-
-
+fwrite(envsummary,"StHelena_seabirds_envdat_summary.csv")
 
 
 
