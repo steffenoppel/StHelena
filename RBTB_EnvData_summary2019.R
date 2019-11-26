@@ -172,9 +172,104 @@ fwrite(envsummary,"StHelena_seabirds_envdat_summary.csv")
 
 
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# CREATE PLOTS TO COMPARE ENVIRONMENTAL DATA AMONG SPECIES AND SEASONS
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+
+## PLOT FOR SEA SURFACE TEMPERATURE
+Medians<-ALLDATA %>%
+  group_by(taxon_canonical_name) %>%
+  summarise(MED=median(SST-273.15, na.rm=T))
+
+
+ggplot(ALLDATA) +
+  geom_histogram(aes(x=SST-273.15,y=(..count..)/tapply(..count..,..PANEL..,sum)[..PANEL..], fill=SEASON),alpha=0.5,binwidth=0.5)+
+  #geom_line(aes(x=SST-273.15,col=SEASON),stat = "density") +
+  facet_wrap(~taxon_canonical_name, ncol=2, scales = "fixed")+
+  geom_vline(data=Medians, aes(xintercept=MED),colour="red", size=0.5, linetype=2) +
+  ylab("Proportion of locations") +
+  xlab("Sea surface temperature (C)") +
+  theme(panel.background=element_rect(fill="white", colour="black"), 
+        axis.text.y=element_text(size=18, color="black"),
+        axis.text.x=element_text(size=14, color="black", angle=45, vjust=0.5), 
+        axis.title=element_text(size=20), 
+        strip.text.x=element_text(size=18, color="black"), 
+        strip.background=element_rect(fill="white", colour="black"), 
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.border = element_blank(),
+        legend.key = element_blank(),
+        legend.title=element_text(size=16),
+        legend.text=element_text(size=14))
+
+ggsave("StHel_Seabird_SST_freq.pdf", width=8, height=8)
 
 
 
 
+
+## PLOT FOR SUNSHINE DURATION
+
+Medians<-ALLDATA %>%
+  group_by(taxon_canonical_name) %>%
+  summarise(MED=median(Sunshine, na.rm=T))
+
+
+ggplot(ALLDATA) +
+  geom_histogram(aes(x=Sunshine,y=(..count..)/tapply(..count..,..PANEL..,sum)[..PANEL..], fill=SEASON),alpha=0.5,binwidth=1000)+
+  #geom_line(aes(x=SST-273.15,col=SEASON),stat = "density") +
+  facet_wrap(~taxon_canonical_name, ncol=2, scales = "fixed")+
+  geom_vline(data=Medians, aes(xintercept=MED),colour="red", size=0.5, linetype=2) +
+  ylab("Proportion of locations") +
+  xlab("Daily sunshine duration (seconds)") +
+  theme(panel.background=element_rect(fill="white", colour="black"), 
+        axis.text.y=element_text(size=18, color="black"),
+        axis.text.x=element_text(size=14, color="black", angle=45, vjust=0.5), 
+        axis.title=element_text(size=20), 
+        strip.text.x=element_text(size=18, color="black"), 
+        strip.background=element_rect(fill="white", colour="black"), 
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.border = element_blank(),
+        legend.key = element_blank(),
+        legend.title=element_text(size=16),
+        legend.text=element_text(size=14))
+
+ggsave("StHel_Seabird_Sunshine_freq.pdf", width=8, height=8)
+
+
+
+
+
+## PLOT FOR CHL A
+
+Medians<-ALLDATA %>%
+  group_by(taxon_canonical_name) %>%
+  summarise(MED=median(CHLA, na.rm=T))
+
+
+ggplot(ALLDATA) +
+  geom_histogram(aes(x=CHLA,y=(..count..)/tapply(..count..,..PANEL..,sum)[..PANEL..], fill=SEASON),alpha=0.5,binwidth=0.05)+
+  #geom_line(aes(x=SST-273.15,col=SEASON),stat = "density") +
+  geom_vline(data=Medians, aes(xintercept=MED),colour="red", size=0.5, linetype=2) +
+  facet_wrap(~taxon_canonical_name, ncol=2, scales = "fixed")+
+  ylab("Proportion of locations") +
+  xlab("Chlorophyll a concentration") +
+  theme(panel.background=element_rect(fill="white", colour="black"), 
+        axis.text.y=element_text(size=18, color="black"),
+        axis.text.x=element_text(size=14, color="black", angle=45, vjust=0.5), 
+        axis.title=element_text(size=20), 
+        strip.text.x=element_text(size=18, color="black"), 
+        strip.background=element_rect(fill="white", colour="black"), 
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.border = element_blank(),
+        legend.key = element_blank(),
+        legend.title=element_text(size=16),
+        legend.text=element_text(size=14))
+
+ggsave("StHel_Seabird_CHLA_freq.pdf", width=8, height=8)
 
 
