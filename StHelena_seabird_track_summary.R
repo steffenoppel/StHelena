@@ -244,12 +244,15 @@ ggsave("StHelena_seabird_areas.pdf", width=7, height=10)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # SPLIT INTO FORAGING TRIPS
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## THIS FUNCTION ONLY WORKS FOR ONE SPECIES AT A TIME UNLESS YOU USE A NEST ID FOR EACH INDIVIDUAL
+SELSPEC="MASPE"
+
 ### NEEDS TO BE DONE TWICE FOR SHORT AND MULTI-TRIPS
 names(tracks)
 names(nests)
 
 tracks<- tracks %>% filter(!is.na(Latitude)) %>% filter(!is.na(Longitude))
-colony<-nests %>% filter(species %in% SPEC) %>% group_by(species) %>%
+colony<-nests %>% filter(species==SELSPEC) %>% group_by(species) %>%
   summarise(Latitude=mean(Latitude, na.rm=T), Longitude=mean(Longitude, na.rm=T)) %>%
   dplyr::select(Latitude, Longitude)
 
