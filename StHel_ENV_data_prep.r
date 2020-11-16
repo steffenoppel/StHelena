@@ -58,7 +58,7 @@ setwd("C:\\STEFFEN\\RSPB\\UKOT\\StHelena\\Science\\Birds\\seabirds\\ENVBackgroun
 subfolders<-list.dirs()
 env.bgr<-data.frame()
 
-for (d in 2:length(subfolders)){
+for (d in c(2:17,20,22:length(subfolders))){
   
   setwd(paste("C:/STEFFEN/RSPB/UKOT/StHelena/Science/Birds/seabirds/ENVBackground",subfolders[d],sep=""))
 
@@ -71,7 +71,7 @@ for (d in 2:length(subfolders)){
     
     ## EXTRACT DATE FROM FILE NAME
     regexp <- "[[:digit:]]+"
-    adjfilename<-str_replace(grid.files[f], pattern=c("2 m|10 m|4km|8d|AR 1"), replace="") ### this needs to be adjusted for some file/folder names that have 2m 8 d 10 m etc. in the name!
+    adjfilename<-str_replace(grid.files[f], pattern=c("2 m|10 m|4km|8d|AR 1|3deg|5d"), replace="") ### this needs to be adjusted for some file/folder names that have 2m 8 d 10 m etc. in the name!
     filedate<-ymd_hms(substr(str_extract(adjfilename, regexp),1,14)) 
     
     ## READ IN DATA
