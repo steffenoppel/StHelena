@@ -95,6 +95,6 @@ env.bgr<-rbind(env.bgr,env.bg.add)
 head(env.bgr)
 dim(env.bgr)
 
-
+fwrite(env.bgr,"StHel_EnvDat_Background.csv")
 
 
