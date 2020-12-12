@@ -95,6 +95,7 @@ env.bgr<-rbind(env.bgr,env.bg.add)
 head(env.bgr)
 dim(env.bgr)
 
+setwd("C:\\STEFFEN\\RSPB\\UKOT\\StHelena\\Science\\Birds\\seabirds\\ENVBackground")
 fwrite(env.bgr,"StHel_EnvDat_Background.csv")
 
 
