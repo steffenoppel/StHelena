@@ -134,7 +134,7 @@ env.bird<-rbind(env.bird,env.bird.add)
 } # close loop over each directory
 
 
-head(env.bgr)
+head(env.bird)
 dim(env.bgr)
 unique(env.bgr$time)
 
@@ -145,19 +145,29 @@ unique(env.bgr$time)
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\StHelena\\Science\\Birds\\seabirds\\ENVBackground")
 save.image("StHel_EnvDat_Background.RData")
 fwrite(env.bgr,"StHel_EnvDat_Background.csv")
+fwrite(env.bird,"StHel_EnvDat_BirdLocs.csv")
+
+## SAVE ONLY MASP DATA
+unique(env.bird$individual.taxon.canonical.name)
+MASP<-env.bird %>% filter(`individual.taxon.canonical.name`=="Oceanodroma castro")
+fwrite(MASP,"StHel_EnvDat_MASPLocs.csv")
 
 
 
-##### AVERAGE ALL THE ENVIRONMENTAL VARIABLES FOR SEVERAL TIME PERIODS ###
-head(env.bgr)
-
-env.per<- env.bgr %>% mutate(year=year(time), month=month(time)) %>%
-  mutate(period=ifelse(month>7,"hot","cool")) %>%
-  mutate(period=paste(period, year, sep="_"))
-head(env.per)
 
 
-env.sum<-env.per %>% group_by(Long,Lat,period,variable) %>%
-  summarise(value=mean(value, na.rm=T))
-dim(env.sum)
-fwrite(env.sum,"StHel_EnvDat_Background.csv")
+####### ABANDONED CODE - AVERAGING ACROSS SEASONS WHEN EACH FILE IS READ IN ONE BY ONE ##########
+# 
+# ##### AVERAGE ALL THE ENVIRONMENTAL VARIABLES FOR SEVERAL TIME PERIODS ###
+# head(env.bgr)
+# 
+# env.per<- env.bgr %>% mutate(year=year(time), month=month(time)) %>%
+#   mutate(period=ifelse(month>7,"hot","cool")) %>%
+#   mutate(period=paste(period, year, sep="_"))
+# head(env.per)
+# 
+# 
+# env.sum<-env.per %>% group_by(Long,Lat,period,variable) %>%
+#   summarise(value=mean(value, na.rm=T))
+# dim(env.sum)
+# fwrite(env.sum,"StHel_EnvDat_Background.csv")
